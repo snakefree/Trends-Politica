@@ -1,0 +1,32 @@
+# Entorno virtual
+venv/
+.venv/
+
+# Variables de entorno (contiene API keys)
+.env
+
+# Salidas generadas
+reports/
+data/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Playwright (TikTokApi)
+.playwright/
+
+# IDEs
+.vscode/
+.idea/
+*.cursor/
+
+# Windows
+Thumbs.db
+desktop.ini

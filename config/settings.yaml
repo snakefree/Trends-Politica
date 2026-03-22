@@ -1,0 +1,72 @@
+# Configuración del agente Trends-Política
+# Edita este archivo para personalizar las búsquedas y el schedule
+
+# Google Trends
+geo: PE                  # Código de país: Perú
+timeframe: now 7-d       # Período: últimos 7 días (opciones: now 1-d, now 7-d, today 1-m)
+
+# Palabras clave a monitorear en Google Trends
+keywords_politica:
+  - gobierno peruano
+  - congreso peru
+  - presidente peru
+  - elecciones peru 2026
+  - Boluarte
+  - JNE peru
+  - MEF peru
+  - PCM peru
+
+# Categorías temáticas para clasificación
+categorias:
+  - ejecutivo
+  - legislativo
+  - electoral
+  - economía
+  - seguridad
+  - corrupción
+  - internacional
+
+# Feeds RSS de medios peruanos de política
+rss_feeds:
+  - name: RPP Noticias
+    url: https://rpp.pe/rss/politica.xml
+  - name: El Comercio
+    url: https://elcomercio.pe/arc/outboundfeeds/rss/?outputType=xml&size=20
+  - name: La República
+    url: https://larepublica.pe/rss/politica
+  - name: Peru21
+    url: https://peru21.pe/rss/politica.xml
+  - name: Gestión
+    url: https://gestion.pe/rss/politica
+  - name: Infobae Perú
+    url: https://www.infobae.com/feeds/rss/peru/politica/
+  - name: Exitosa
+    url: https://exitosanoticias.pe/rss/politica
+
+# Horas de antigüedad máxima de los artículos RSS
+rss_horas_atras: 48
+
+# Scheduling automático
+schedule:
+  interval: daily        # opciones: hourly, daily, weekly
+  hora: "08:00"          # hora de ejecución diaria (formato HH:MM)
+  dia_semana: monday     # solo para interval: weekly
+
+# Plataformas para generación de posts
+plataformas_posts:
+  - nombre: X (Twitter)
+    max_chars: 280
+    incluir_hashtags: true
+    max_hashtags: 5
+  - nombre: Instagram
+    max_chars: 2200
+    incluir_hashtags: true
+    max_hashtags: 30
+  - nombre: Facebook
+    max_chars: 63206
+    incluir_hashtags: false
+    estilo: informativo_largo
+  - nombre: TikTok
+    max_chars: 150
+    tipo: guion_video
+    duracion_seg: 60
