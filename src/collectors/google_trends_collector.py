@@ -36,21 +36,25 @@ class GoogleTrendsCollector:
         self.pytrends = TrendReq(hl="es-419", tz=300)  # UTC-5 Lima
 
     def get_trending_searches(self) -> list[dict]:
-        """Retorna las búsquedas de tendencia diaria en Perú."""
+        """Retorna las búsquedas de tendencia en tiempo real en Perú."""
         try:
-            df = self.pytrends.trending_searches(pn="peru")
+            df = self.pytrends.realtime_trending_searches(pn=self.geo)
             tendencias = []
-            for keyword in df[0].tolist():
-                tendencias.append({
-                    "keyword": keyword,
-                    "score": None,
-                    "related": [],
-                    "source": "google_trends_daily",
-                })
-            logger.info("Google Trends daily: %d tendencias", len(tendencias))
+            for _, row in df.iterrows():
+                keyword = row.get("title", "") or row.get("entityNames", "")
+                if isinstance(keyword, list):
+                    keyword = ", ".join(keyword)
+                if keyword:
+                    tendencias.append({
+                        "keyword": str(keyword),
+                        "score": None,
+                        "related": [],
+                        "source": "google_trends_daily",
+                    })
+            logger.info("Google Trends realtime: %d tendencias", len(tendencias))
             return tendencias
         except Exception as exc:
-            logger.warning("Error en trending_searches: %s", exc)
+            logger.info("Google Trends realtime no disponible (%s) — usando solo interest_over_time", exc)
             return []
 
     def get_interest_over_time(self, keywords: list[str] | None = None) -> list[dict]:
