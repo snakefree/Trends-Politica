@@ -10,9 +10,11 @@ Uso:
     python main.py schedule --interval daily  # Iniciar scheduler
     python main.py status                     # Estado del scheduler
 """
+import json
 import logging
 import os
 import sys
+from datetime import date
 from pathlib import Path
 
 import click
@@ -34,6 +36,15 @@ def _dir_reportes() -> Path:
     if base:
         return Path(base)
     return Path(__file__).parent / "reports"
+
+
+def _guardar_cache(datos: list) -> Path:
+    """Guarda los datos crudos en data/raw_YYYY-MM-DD.json para reutilización."""
+    dir_datos = Path(os.getenv("DIRECTORIO_DATOS", str(Path(__file__).parent / "data")))
+    dir_datos.mkdir(parents=True, exist_ok=True)
+    path = dir_datos / f"raw_{date.today().isoformat()}.json"
+    path.write_text(json.dumps(datos, ensure_ascii=False, indent=2), encoding="utf-8")
+    return path
 
 
 def _ultimo_informe() -> Path | None:
@@ -107,8 +118,11 @@ def run(source: str, solo_recolectar: bool):
         click.echo("No se encontraron datos. Verifica tu conexión y la configuración.", err=True)
         sys.exit(1)
 
+    cache_path = _guardar_cache(datos_raw)
+    click.echo(f"Datos guardados en: {cache_path}")
+
     if solo_recolectar:
-        click.echo("Modo --solo-recolectar: omitiendo análisis.")
+        click.echo("Modo --solo-recolectar: análisis omitido.")
         return
 
     # Verificar API key antes de llamar a Claude
