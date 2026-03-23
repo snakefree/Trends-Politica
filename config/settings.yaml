@@ -26,22 +26,20 @@ categorias:
   - corrupción
   - internacional
 
-# Feeds RSS de medios peruanos de política
+# Feeds RSS de medios peruanos de política (URLs verificadas)
 rss_feeds:
-  - name: RPP Noticias
-    url: https://rpp.pe/rss/politica.xml
   - name: El Comercio
     url: https://elcomercio.pe/arc/outboundfeeds/rss/?outputType=xml&size=20
   - name: La República
-    url: https://larepublica.pe/rss/politica
-  - name: Peru21
-    url: https://peru21.pe/rss/politica.xml
+    url: https://larepublica.pe/rss/politica.xml
   - name: Gestión
-    url: https://gestion.pe/rss/politica
+    url: https://gestion.pe/arc/outboundfeeds/rss/category/peru/?outputType=xml
   - name: Infobae Perú
-    url: https://www.infobae.com/feeds/rss/peru/politica/
-  - name: Exitosa
-    url: https://exitosanoticias.pe/rss/politica
+    url: https://www.infobae.com/arc/outboundfeeds/rss/category/america/peru/?outputType=xml
+  - name: Andina (agencia oficial)
+    url: https://andina.pe/agencia/rss.aspx?id=4
+  - name: Correo
+    url: https://diariocorreo.pe/arc/outboundfeeds/rss/category/peru/?outputType=xml
 
 # Horas de antigüedad máxima de los artículos RSS
 rss_horas_atras: 48
