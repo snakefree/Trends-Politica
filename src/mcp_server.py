@@ -119,13 +119,14 @@ async def obtener_tendencias(
     fuente: str = "all",
 ) -> str:
     """
-    Recolecta datos de tendencias sin ejecutar el análisis de Claude.
-    Útil para explorar los datos crudos o verificar la conectividad.
+    Recolecta datos de tendencias, guarda caché en data/ y retorna TODOS los artículos
+    y keywords para que Claude Code pueda analizarlos directamente en el chat.
 
     Parámetros:
         fuente: 'all', 'rss', 'google_trends', 'twitter', 'tiktok'
 
-    Retorna un resumen de los datos recolectados.
+    Retorna todos los títulos RSS y keywords de Google Trends recolectados,
+    más la ruta del archivo de caché guardado.
     """
     from src.collectors.rss_collector import RSSCollector
     from src.collectors.twitter_collector import TwitterCollector
@@ -153,24 +154,37 @@ async def obtener_tendencias(
         tt = TikTokCollector()
         datos.extend(await asyncio.to_thread(tt.collect_all))
 
-    # Resumen por fuente
+    # Guardar caché completa en data/
+    dir_datos = Path(os.getenv("DIRECTORIO_DATOS", str(Path(__file__).parent.parent / "data")))
+    dir_datos.mkdir(parents=True, exist_ok=True)
+    cache_path = dir_datos / f"raw_{date.today().isoformat()}.json"
+    cache_path.write_text(json.dumps(datos, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    # Devolver TODOS los artículos RSS (titulo + resumen breve + fuente)
     from collections import Counter
     por_fuente = Counter(d.get("source", "desconocido") for d in datos)
-    muestra_rss = [
-        {"titulo": d["titulo"], "fuente": d["fuente"]}
+
+    articulos_rss = [
+        {
+            "titulo": d.get("titulo", ""),
+            "fuente": d.get("fuente", ""),
+            "resumen": (d.get("resumen") or "")[:200],
+        }
         for d in datos if d.get("source") == "rss"
-    ][:10]
-    muestra_trends = [
-        {"keyword": d["keyword"], "score": d.get("score")}
+    ]
+
+    keywords_trends = [
+        {"keyword": d["keyword"], "score": d.get("score"), "fuente": d.get("source")}
         for d in datos if "google_trends" in d.get("source", "")
-    ][:10]
+    ]
 
     return json.dumps(
         {
             "total": len(datos),
+            "cache": str(cache_path),
             "por_fuente": dict(por_fuente),
-            "muestra_rss": muestra_rss,
-            "muestra_google_trends": muestra_trends,
+            "articulos_rss": articulos_rss,
+            "keywords_google_trends": keywords_trends,
         },
         ensure_ascii=False,
         indent=2,
@@ -286,6 +300,67 @@ def leer_informe(fecha: str = "", archivo: str = "00_resumen.md") -> str:
         return f"Archivo no encontrado: {path}"
 
     return path.read_text(encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# Herramienta 6: Guardar informe generado manualmente por Claude Code
+# ---------------------------------------------------------------------------
+@mcp.tool()
+def guardar_informe_manual(
+    resumen: str,
+    tendencias: str,
+    analisis: str,
+    posts_redes: str,
+    fuentes: str,
+    fecha: str = "",
+) -> str:
+    """
+    Escribe los 5 archivos Markdown del informe con contenido generado por Claude Code.
+    Usar cuando Claude Code hace el análisis directamente en el chat (sin API key propia).
+
+    Parámetros:
+        resumen: Contenido Markdown para 00_resumen.md (headline + top 3 temas)
+        tendencias: Contenido Markdown para 01_tendencias.md (ranking completo)
+        analisis: Contenido Markdown para 02_analisis.md (análisis profundo)
+        posts_redes: Contenido Markdown para 03_posts_redes.md (borradores por plataforma)
+        fuentes: Contenido Markdown para 04_fuentes.md (URLs y metadatos)
+        fecha: Fecha YYYY-MM-DD. Si está vacío, usa hoy.
+
+    Retorna las rutas de los archivos creados.
+    """
+    if not fecha:
+        fecha = date.today().isoformat()
+
+    dir_reportes = Path(DIRECTORIO_REPORTES) / fecha
+    dir_reportes.mkdir(parents=True, exist_ok=True)
+
+    archivos = {
+        "00_resumen.md": resumen,
+        "01_tendencias.md": tendencias,
+        "02_analisis.md": analisis,
+        "03_posts_redes.md": posts_redes,
+        "04_fuentes.md": fuentes,
+    }
+
+    rutas = {}
+    for nombre, contenido in archivos.items():
+        path = dir_reportes / nombre
+        path.write_text(contenido, encoding="utf-8")
+        rutas[nombre] = str(path)
+
+    # Actualizar índice en reports/README.md
+    readme = Path(DIRECTORIO_REPORTES) / "README.md"
+    indice = "# Índice de informes — Trends-Política\n\n"
+    for carpeta in sorted(Path(DIRECTORIO_REPORTES).iterdir(), reverse=True):
+        if carpeta.is_dir():
+            indice += f"- [{carpeta.name}]({carpeta.name}/00_resumen.md)\n"
+    readme.write_text(indice, encoding="utf-8")
+
+    return json.dumps(
+        {"fecha": fecha, "archivos_creados": rutas},
+        ensure_ascii=False,
+        indent=2,
+    )
 
 
 if __name__ == "__main__":
