@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "trends-politica": {
+      "command": "D:/Development/Trends-Política/venv/Scripts/python.exe",
+      "args": ["-m", "src.mcp_server"],
+      "cwd": "D:/Development/Trends-Política",
+      "env": {
+        "PYTHONPATH": "D:/Development/Trends-Política"
+      }
+    }
+  }
+}

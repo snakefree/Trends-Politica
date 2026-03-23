@@ -30,3 +30,6 @@ build/
 # Windows
 Thumbs.db
 desktop.ini
+
+# Claude Code (permisos locales — no compartir)
+.claude/
