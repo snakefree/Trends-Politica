@@ -4,9 +4,22 @@ Agente de monitoreo de tendencias políticas peruanas en redes sociales y medios
 
 ## Propósito
 
-Recolecta datos de Google Trends y RSS de medios peruanos, usa la API de Claude para analizar
-los temas políticos más candentes, y genera informes modulares en Markdown listos para elaborar
-posts en Instagram, Facebook, X (Twitter) y TikTok.
+Recolecta datos de Google Trends y RSS de medios peruanos, analiza los temas políticos más
+candentes, y genera informes modulares en Markdown listos para elaborar posts en Instagram,
+Facebook, X (Twitter) y TikTok.
+
+## Flujo de trabajo
+
+### Modo actual — análisis en Claude Code (sin API key)
+
+1. `obtener_tendencias` — recolecta RSS y Google Trends, guarda caché en `data/`, devuelve artículos filtrados por relevancia política
+2. Claude Code analiza los artículos directamente en el chat
+3. `guardar_informe_manual` — escribe los 5 archivos MD con el análisis generado
+
+### Modo completo — pipeline automático (requiere `ANTHROPIC_API_KEY`)
+
+1. `ejecutar_analisis` — pipeline completo: recolección → análisis con Claude API → informe
+2. O bien: `generar_informe` — analiza desde caché existente para una fecha dada
 
 ## Comandos CLI
 
@@ -21,6 +34,9 @@ python main.py run
 python main.py run --source rss
 python main.py run --source google_trends
 
+# Solo recolectar sin analizar
+python main.py run --solo-recolectar
+
 # Ver el último informe generado
 python main.py report
 
@@ -32,13 +48,13 @@ python main.py schedule --interval weekly
 python main.py status
 ```
 
-## Variables de entorno requeridas
+## Variables de entorno
 
 Copiar `.env.example` a `.env` y configurar:
 
 | Variable | Descripción | Requerida |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | Clave API de Anthropic | Sí |
+| `ANTHROPIC_API_KEY` | Clave API de Anthropic | Solo para pipeline automático |
 | `CLAUDE_MODEL` | Modelo a usar (default: claude-sonnet-4-6) | No |
 | `DIRECTORIO_REPORTES` | Ruta de salida de informes | No |
 | `DIRECTORIO_DATOS` | Ruta de caché de datos crudos | No |
@@ -115,8 +131,16 @@ Agregar en `%APPDATA%\Claude\claude_desktop_config.json`:
 }
 ```
 
-Reiniciar Claude Code. Herramientas disponibles: `ejecutar_analisis`, `obtener_tendencias`,
-`generar_informe`, `listar_informes`, `leer_informe`.
+Reiniciar Claude Code. Herramientas disponibles:
+
+| Herramienta | Requiere API key | Descripción |
+|---|---|---|
+| `obtener_tendencias` | No | Recolecta datos y devuelve artículos políticos filtrados |
+| `guardar_informe_manual` | No | Escribe los 5 MD con análisis generado por Claude Code |
+| `listar_informes` | No | Lista informes generados por fecha |
+| `leer_informe` | No | Lee un archivo MD de un informe existente |
+| `ejecutar_analisis` | Sí | Pipeline completo automático |
+| `generar_informe` | Sí | Analiza desde caché para una fecha dada |
 
 ## Instalación
 
@@ -126,5 +150,5 @@ py -3 -m venv venv
 venv\Scripts\activate
 pip install -r requirements.txt
 copy .env.example .env
-# Editar .env con tu ANTHROPIC_API_KEY
+# Editar .env con ANTHROPIC_API_KEY si se quiere usar el pipeline automático
 ```
