@@ -160,30 +160,48 @@ async def obtener_tendencias(
     cache_path = dir_datos / f"raw_{date.today().isoformat()}.json"
     cache_path.write_text(json.dumps(datos, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    # Devolver TODOS los artículos RSS (titulo + resumen breve + fuente)
     from collections import Counter
+    import yaml
+
+    # Cargar keywords políticas desde settings.yaml para filtrar
+    settings_path = Path(__file__).parent.parent / "config" / "settings.yaml"
+    with open(settings_path, encoding="utf-8") as f:
+        settings = yaml.safe_load(f)
+
+    keywords_politica = [k.lower() for k in settings.get("keywords_politica", [])]
+    categorias = [c.lower() for c in settings.get("categorias", [])]
+    terminos_filtro = keywords_politica + categorias + [
+        "congres", "ministr", "premier", "fiscal", "corrupci", "eleccion",
+        "partido", "voto", "ley ", "decreto", "poder judicial", "tribunal",
+        "boluarte", "petro", "gobierno", "presupuest", "reforma",
+    ]
+
+    def es_politico(art: dict) -> bool:
+        texto = f"{art.get('titulo', '')} {art.get('resumen', '')}".lower()
+        return any(t in texto for t in terminos_filtro)
+
     por_fuente = Counter(d.get("source", "desconocido") for d in datos)
 
-    articulos_rss = [
-        {
-            "titulo": d.get("titulo", ""),
-            "fuente": d.get("fuente", ""),
-            "resumen": (d.get("resumen") or "")[:200],
-        }
-        for d in datos if d.get("source") == "rss"
+    # Solo artículos políticos, solo títulos + fuente (payload mínimo)
+    articulos_politicos = [
+        {"titulo": d.get("titulo", ""), "fuente": d.get("fuente", "")}
+        for d in datos
+        if d.get("source") == "rss" and es_politico(d)
     ]
 
     keywords_trends = [
-        {"keyword": d["keyword"], "score": d.get("score"), "fuente": d.get("source")}
+        {"keyword": d["keyword"], "score": d.get("score")}
         for d in datos if "google_trends" in d.get("source", "")
     ]
 
     return json.dumps(
         {
-            "total": len(datos),
+            "total_recolectado": len(datos),
+            "total_politico": len(articulos_politicos),
             "cache": str(cache_path),
             "por_fuente": dict(por_fuente),
-            "articulos_rss": articulos_rss,
+            "nota": "Cache completa guardada. Artículos filtrados por relevancia política.",
+            "articulos_politicos": articulos_politicos,
             "keywords_google_trends": keywords_trends,
         },
         ensure_ascii=False,
