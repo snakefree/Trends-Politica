@@ -12,6 +12,8 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent.parent.parent / ".env")
 
+from src.analyzer.claude_analyzer import AnalisisResult  # noqa: E402
+
 logger = logging.getLogger(__name__)
 
 
@@ -38,7 +40,6 @@ class ReportGenerator:
     # Archivo 00: Resumen ejecutivo (lectura rápida, ≤1 página)
     # ------------------------------------------------------------------
     def _escribir_resumen(self, resultado, dir_hoy: Path) -> Path:
-        from src.analyzer.claude_analyzer import AnalisisResult
         r: AnalisisResult = resultado
         top3 = r.temas[:3]
         lineas = [
@@ -79,7 +80,6 @@ class ReportGenerator:
     # Archivo 01: Tendencias rankeadas
     # ------------------------------------------------------------------
     def _escribir_tendencias(self, resultado, dir_hoy: Path) -> Path:
-        from src.analyzer.claude_analyzer import AnalisisResult
         r: AnalisisResult = resultado
         lineas = [
             f"# Tendencias políticas rankeadas — {r.fecha}",
@@ -117,7 +117,6 @@ class ReportGenerator:
     # Archivo 02: Análisis en profundidad
     # ------------------------------------------------------------------
     def _escribir_analisis(self, resultado, dir_hoy: Path) -> Path:
-        from src.analyzer.claude_analyzer import AnalisisResult
         r: AnalisisResult = resultado
         lineas = [
             f"# Análisis político en profundidad — {r.fecha}",
@@ -162,7 +161,6 @@ class ReportGenerator:
     # Archivo 03: Posts de redes sociales
     # ------------------------------------------------------------------
     def _escribir_posts(self, resultado, dir_hoy: Path) -> Path:
-        from src.analyzer.claude_analyzer import AnalisisResult
         r: AnalisisResult = resultado
         lineas = [
             f"# Borradores de posts para redes sociales — {r.fecha}",
@@ -231,7 +229,6 @@ class ReportGenerator:
     # Archivo 04: Fuentes y datos crudos
     # ------------------------------------------------------------------
     def _escribir_fuentes(self, datos_raw: list[dict], resultado, dir_hoy: Path) -> Path:
-        from src.analyzer.claude_analyzer import AnalisisResult
         r: AnalisisResult = resultado
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         lineas = [

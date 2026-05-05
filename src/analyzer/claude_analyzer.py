@@ -10,6 +10,7 @@ from pathlib import Path
 
 import anthropic
 from dotenv import load_dotenv
+from tenacity import retry, wait_exponential, stop_after_attempt, retry_if_exception_type
 
 load_dotenv(Path(__file__).parent.parent.parent / ".env")
 
@@ -149,8 +150,15 @@ class ClaudeAnalyzer:
         self.client = anthropic.Anthropic(api_key=api_key)
         self.modelo = os.getenv("CLAUDE_MODEL", MODELO_DEFAULT)
 
+    @retry(
+        retry=retry_if_exception_type((anthropic.APIConnectionError, anthropic.RateLimitError)),
+        wait=wait_exponential(multiplier=1, min=2, max=30),
+        stop=stop_after_attempt(3),
+        reraise=True,
+    )
     def _llamar_claude(self, prompt: str, max_tokens: int = 4096) -> str:
-        """Realiza una llamada a la API de Claude y retorna el texto de respuesta."""
+        """Realiza una llamada a la API de Claude y retorna el texto de respuesta.
+        Reintenta automáticamente hasta 3 veces ante errores de red o rate limit."""
         mensaje = self.client.messages.create(
             model=self.modelo,
             max_tokens=max_tokens,
@@ -175,7 +183,13 @@ class ClaudeAnalyzer:
         except json.JSONDecodeError as exc:
             logger.error("Claude no retornó JSON válido: %s", exc)
             logger.debug("Respuesta recibida: %s", respuesta_json[:500])
-            return AnalisisResult(fecha=date.today().isoformat())
+            raise RuntimeError("Respuesta de Claude no es JSON válido") from exc
+
+        campos_requeridos = {"temas", "narrativa_general", "recomendaciones"}
+        faltantes = campos_requeridos - parsed.keys()
+        if faltantes:
+            logger.error("JSON de Claude incompleto. Faltan campos: %s", faltantes)
+            raise RuntimeError(f"JSON de Claude incompleto: faltan {faltantes}")
 
         temas = []
         for t in parsed.get("temas", []):

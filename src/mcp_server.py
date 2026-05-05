@@ -223,6 +223,10 @@ async def generar_informe(fecha: str = "") -> str:
 
     Retorna las rutas de los archivos generados.
     """
+    import re
+    if fecha and not re.match(r"^\d{4}-\d{2}-\d{2}$", fecha):
+        return json.dumps({"error": "Formato de fecha inválido. Usar YYYY-MM-DD."})
+
     if not fecha:
         fecha = date.today().isoformat()
 

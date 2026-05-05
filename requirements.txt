@@ -12,6 +12,7 @@ pyyaml>=6.0.3
 # --- CLI y scheduling ---
 click>=8.3.1
 apscheduler>=3.11.2
+tenacity>=8.2.0
 
 # --- Opcionales: instalar manualmente si se desean ---
 # pip install ntscraper>=0.4.0         # Twitter/X sin API oficial

@@ -16,7 +16,7 @@ load_dotenv(Path(__file__).parent.parent.parent / ".env")
 logger = logging.getLogger(__name__)
 
 try:
-    from apscheduler.schedulers.blocking import BlockingScheduler
+    from apscheduler.schedulers.background import BackgroundScheduler
     from apscheduler.triggers.cron import CronTrigger
     from apscheduler.triggers.interval import IntervalTrigger
     _APSCHEDULER_DISPONIBLE = True
@@ -121,7 +121,7 @@ def iniciar_scheduler(interval: str = "daily", hora: str = "08:00") -> None:
     estado = {"interval": interval, "hora": hora}
     _guardar_estado(estado)
 
-    scheduler = BlockingScheduler(timezone="America/Lima")
+    scheduler = BackgroundScheduler(timezone="America/Lima")
 
     if interval == "hourly":
         trigger = IntervalTrigger(hours=1)
@@ -137,16 +137,22 @@ def iniciar_scheduler(interval: str = "daily", hora: str = "08:00") -> None:
 
     scheduler.add_job(ejecutar_pipeline, trigger, id="pipeline_tendencias")
 
+    _activo = [True]
+
     def _salir(sig, frame):
         logger.info("Deteniendo scheduler...")
         scheduler.shutdown()
-        sys.exit(0)
+        _activo[0] = False
 
     signal.signal(signal.SIGINT, _salir)
     signal.signal(signal.SIGTERM, _salir)
 
-    logger.info("Scheduler activo. Ctrl+C para detener.")
     scheduler.start()
+    logger.info("Scheduler activo en segundo plano. Ctrl+C para detener.")
+
+    import time
+    while _activo[0]:
+        time.sleep(1)
 
 
 def obtener_estado() -> dict:
