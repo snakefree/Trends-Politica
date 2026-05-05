@@ -20,6 +20,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 from datetime import date
 from pathlib import Path
 
@@ -62,38 +63,20 @@ async def ejecutar_analisis(
     Retorna un JSON con las rutas de los 5 archivos Markdown generados.
     Puede tardar 1-3 minutos dependiendo de la cantidad de datos.
     """
-    from src.collectors.rss_collector import RSSCollector
-    from src.collectors.twitter_collector import TwitterCollector
-    from src.collectors.tiktok_collector import TikTokCollector
+    from src.pipeline import recolectar_datos
     from src.analyzer.claude_analyzer import ClaudeAnalyzer
     from src.reporter.report_generator import ReportGenerator
 
-    datos_raw = []
-
-    if fuente in ("all", "rss"):
-        rss = RSSCollector()
-        datos_raw.extend(await rss.collect_all())
-
-    if fuente in ("all", "google_trends"):
-        try:
-            from src.collectors.google_trends_collector import GoogleTrendsCollector
-            gt = GoogleTrendsCollector()
-            datos_raw.extend(await asyncio.to_thread(gt.collect_all))
-        except ImportError:
-            pass
-
-    if fuente in ("all", "twitter"):
-        tw = TwitterCollector()
-        datos_raw.extend(await asyncio.to_thread(tw.collect_all))
-
-    if fuente in ("all", "tiktok"):
-        tt = TikTokCollector()
-        datos_raw.extend(await asyncio.to_thread(tt.collect_all))
+    datos_raw = await recolectar_datos(fuente)
 
     if not datos_raw:
         return json.dumps({"error": "No se encontraron datos. Verifica conexión y configuración."})
 
-    analyzer = ClaudeAnalyzer()
+    try:
+        analyzer = ClaudeAnalyzer()
+    except ValueError as exc:
+        return json.dumps({"error": str(exc)})
+
     resultado = await asyncio.to_thread(analyzer.analizar_y_generar_posts, datos_raw)
 
     reporter = ReportGenerator()
@@ -128,45 +111,27 @@ async def obtener_tendencias(
     Retorna todos los títulos RSS y keywords de Google Trends recolectados,
     más la ruta del archivo de caché guardado.
     """
-    from src.collectors.rss_collector import RSSCollector
-    from src.collectors.twitter_collector import TwitterCollector
-    from src.collectors.tiktok_collector import TikTokCollector
+    from src.pipeline import recolectar_datos, guardar_cache
 
-    datos = []
-
-    if fuente in ("all", "rss"):
-        rss = RSSCollector()
-        datos.extend(await rss.collect_all())
-
-    if fuente in ("all", "google_trends"):
-        try:
-            from src.collectors.google_trends_collector import GoogleTrendsCollector
-            gt = GoogleTrendsCollector()
-            datos.extend(await asyncio.to_thread(gt.collect_all))
-        except ImportError:
-            pass
-
-    if fuente in ("all", "twitter"):
-        tw = TwitterCollector()
-        datos.extend(await asyncio.to_thread(tw.collect_all))
-
-    if fuente in ("all", "tiktok"):
-        tt = TikTokCollector()
-        datos.extend(await asyncio.to_thread(tt.collect_all))
+    datos = await recolectar_datos(fuente)
 
     # Guardar caché completa en data/
     dir_datos = Path(os.getenv("DIRECTORIO_DATOS", str(Path(__file__).parent.parent / "data")))
-    dir_datos.mkdir(parents=True, exist_ok=True)
-    cache_path = dir_datos / f"raw_{date.today().isoformat()}.json"
-    cache_path.write_text(json.dumps(datos, ensure_ascii=False, indent=2), encoding="utf-8")
+    cache_path = guardar_cache(datos, dir_datos)
 
     from collections import Counter
     import yaml
 
     # Cargar keywords políticas desde settings.yaml para filtrar
     settings_path = Path(__file__).parent.parent / "config" / "settings.yaml"
-    with open(settings_path, encoding="utf-8") as f:
-        settings = yaml.safe_load(f)
+    try:
+        with open(settings_path, encoding="utf-8") as f:
+            settings = yaml.safe_load(f)
+    except FileNotFoundError:
+        return json.dumps({
+            "error": f"Archivo de configuración no encontrado: {settings_path}. "
+                     "Verifica que config/settings.yaml exista."
+        })
 
     keywords_politica = [k.lower() for k in settings.get("keywords_politica", [])]
     categorias = [c.lower() for c in settings.get("categorias", [])]
@@ -180,18 +145,18 @@ async def obtener_tendencias(
         texto = f"{art.get('titulo', '')} {art.get('resumen', '')}".lower()
         return any(t in texto for t in terminos_filtro)
 
-    por_fuente = Counter(d.get("source", "desconocido") for d in datos)
+    por_fuente = Counter(d.get("fuente_tipo", "desconocido") for d in datos)
 
     # Solo artículos políticos, solo títulos + fuente (payload mínimo)
     articulos_politicos = [
         {"titulo": d.get("titulo", ""), "fuente": d.get("fuente", "")}
         for d in datos
-        if d.get("source") == "rss" and es_politico(d)
+        if d.get("fuente_tipo") == "rss" and es_politico(d)
     ]
 
     keywords_trends = [
         {"keyword": d["keyword"], "score": d.get("score")}
-        for d in datos if "google_trends" in d.get("source", "")
+        for d in datos if "google_trends" in d.get("fuente_tipo", "")
     ]
 
     return json.dumps(
@@ -216,15 +181,15 @@ async def obtener_tendencias(
 async def generar_informe(fecha: str = "") -> str:
     """
     Genera el análisis e informe para una fecha específica usando datos en caché.
-    Si no hay caché para esa fecha, ejecuta la recolección primero.
+    Si no hay caché para esa fecha, retorna un error indicando que se debe
+    usar `ejecutar_analisis` primero para recolectar los datos.
 
     Parámetros:
         fecha: Fecha en formato YYYY-MM-DD. Si está vacío, usa hoy.
 
     Retorna las rutas de los archivos generados.
     """
-    import re
-    if fecha and not re.match(r"^\d{4}-\d{2}-\d{2}$", fecha):
+    if fecha and not _validar_fecha(fecha):
         return json.dumps({"error": "Formato de fecha inválido. Usar YYYY-MM-DD."})
 
     if not fecha:
@@ -243,7 +208,11 @@ async def generar_informe(fecha: str = "") -> str:
     from src.analyzer.claude_analyzer import ClaudeAnalyzer
     from src.reporter.report_generator import ReportGenerator
 
-    analyzer = ClaudeAnalyzer()
+    try:
+        analyzer = ClaudeAnalyzer()
+    except ValueError as exc:
+        return json.dumps({"error": str(exc)})
+
     resultado = await asyncio.to_thread(analyzer.analizar_y_generar_posts, datos_raw)
 
     reporter = ReportGenerator()
@@ -291,6 +260,33 @@ def listar_informes() -> str:
 # ---------------------------------------------------------------------------
 # Herramienta 5: Leer un informe específico
 # ---------------------------------------------------------------------------
+_ARCHIVOS_PERMITIDOS = {
+    "00_resumen.md",
+    "01_tendencias.md",
+    "02_analisis.md",
+    "03_posts_redes.md",
+    "04_fuentes.md",
+}
+
+_RE_FECHA = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _validar_fecha(fecha: str) -> bool:
+    return bool(_RE_FECHA.match(fecha))
+
+
+def _ruta_segura(base: Path, *partes: str) -> Path | None:
+    """Resuelve la ruta y verifica que sea descendiente del directorio base."""
+    try:
+        ruta = base.resolve()
+        candidata = (base / Path(*partes)).resolve()
+        if candidata.is_relative_to(ruta):
+            return candidata
+    except Exception:
+        pass
+    return None
+
+
 @mcp.tool()
 def leer_informe(fecha: str = "", archivo: str = "00_resumen.md") -> str:
     """
@@ -304,9 +300,17 @@ def leer_informe(fecha: str = "", archivo: str = "00_resumen.md") -> str:
 
     Retorna el contenido del archivo Markdown.
     """
+    if archivo not in _ARCHIVOS_PERMITIDOS:
+        return json.dumps({
+            "error": f"Archivo no permitido: '{archivo}'. "
+                     f"Opciones válidas: {sorted(_ARCHIVOS_PERMITIDOS)}"
+        })
+
     dir_reportes = Path(DIRECTORIO_REPORTES)
 
     if not fecha:
+        if not dir_reportes.exists():
+            return "No hay informes generados. Usa ejecutar_analisis primero."
         carpetas = sorted(
             [d for d in dir_reportes.iterdir() if d.is_dir()],
             reverse=True,
@@ -315,13 +319,18 @@ def leer_informe(fecha: str = "", archivo: str = "00_resumen.md") -> str:
             return "No hay informes generados. Usa ejecutar_analisis primero."
         carpeta = carpetas[0]
     else:
+        if not _validar_fecha(fecha):
+            return json.dumps({"error": "Formato de fecha inválido. Usar YYYY-MM-DD."})
         carpeta = dir_reportes / fecha
 
-    path = carpeta / archivo
-    if not path.exists():
-        return f"Archivo no encontrado: {path}"
+    ruta = _ruta_segura(dir_reportes, carpeta.name, archivo)
+    if ruta is None:
+        return json.dumps({"error": "Ruta no permitida."})
 
-    return path.read_text(encoding="utf-8")
+    if not ruta.exists():
+        return f"Archivo no encontrado: {ruta}"
+
+    return ruta.read_text(encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -352,8 +361,15 @@ def guardar_informe_manual(
     """
     if not fecha:
         fecha = date.today().isoformat()
+    elif not _validar_fecha(fecha):
+        return json.dumps({"error": "Formato de fecha inválido. Usar YYYY-MM-DD."})
 
-    dir_reportes = Path(DIRECTORIO_REPORTES) / fecha
+    dir_base_reportes = Path(DIRECTORIO_REPORTES)
+    ruta_destino = _ruta_segura(dir_base_reportes, fecha)
+    if ruta_destino is None:
+        return json.dumps({"error": "Ruta no permitida."})
+
+    dir_reportes = ruta_destino
     dir_reportes.mkdir(parents=True, exist_ok=True)
 
     archivos = {

@@ -91,7 +91,8 @@ class ReportGenerator:
         ]
         for i, t in enumerate(r.temas, 1):
             actores = ", ".join(t.actores[:3]) if t.actores else "—"
-            barra = "█" * t.relevancia + "░" * (10 - t.relevancia)
+            rel = max(0, min(10, t.relevancia))
+            barra = "█" * rel + "░" * (10 - rel)
             lineas.append(
                 f"| {i} | **{t.titulo}** | {t.categoria} | {barra} {t.relevancia}/10 | {actores} |"
             )
@@ -240,7 +241,7 @@ class ReportGenerator:
         ]
 
         # Google Trends
-        trends = [d for d in datos_raw if "google_trends" in d.get("source", "")]
+        trends = [d for d in datos_raw if "google_trends" in d.get("fuente_tipo", "")]
         if trends:
             lineas += [
                 f"## Google Trends ({len(trends)} items)",
@@ -250,11 +251,11 @@ class ReportGenerator:
             ]
             for t in trends:
                 score = t.get("score") or "—"
-                lineas.append(f"| {t['keyword']} | {score} | {t['source']} |")
+                lineas.append(f"| {t['keyword']} | {score} | {t['fuente_tipo']} |")
             lineas.append("")
 
         # RSS
-        rss = [d for d in datos_raw if d.get("source") == "rss"]
+        rss = [d for d in datos_raw if d.get("fuente_tipo") == "rss"]
         if rss:
             lineas += [
                 f"## Artículos RSS ({len(rss)} artículos)",
@@ -270,7 +271,7 @@ class ReportGenerator:
             lineas.append("")
 
         # Twitter
-        twitter = [d for d in datos_raw if d.get("source") == "twitter"]
+        twitter = [d for d in datos_raw if d.get("fuente_tipo") == "twitter"]
         if twitter:
             lineas += [
                 f"## Twitter/X ({len(twitter)} tweets)",
@@ -284,7 +285,7 @@ class ReportGenerator:
             lineas.append("")
 
         # TikTok
-        tiktok = [d for d in datos_raw if d.get("source") == "tiktok"]
+        tiktok = [d for d in datos_raw if d.get("fuente_tipo") == "tiktok"]
         if tiktok:
             lineas += [
                 f"## TikTok ({len(tiktok)} videos)",

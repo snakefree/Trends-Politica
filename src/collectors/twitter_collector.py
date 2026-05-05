@@ -54,7 +54,7 @@ class TwitterCollector:
                     "retweets": tweet.get("stats", {}).get("retweets", 0),
                     "fecha": tweet.get("date", ""),
                     "keyword": keyword,
-                    "source": "twitter",
+                    "fuente_tipo": "twitter",
                 })
             logger.info("Twitter: %d tweets para '%s'", len(resultados), keyword)
             return resultados
@@ -62,7 +62,7 @@ class TwitterCollector:
             logger.warning("Error al recolectar Twitter para '%s': %s", keyword, exc)
             return []
 
-    def collect_all(self) -> list[dict]:
+    def recolectar_todo(self) -> list[dict]:
         """Recolecta tweets para todas las keywords configuradas."""
         if not self._esta_disponible():
             return []

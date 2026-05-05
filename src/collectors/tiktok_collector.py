@@ -51,13 +51,13 @@ class TikTokCollector:
                     "compartidos": video.as_dict.get("stats", {}).get("shareCount", 0),
                     "vistas": video.as_dict.get("stats", {}).get("playCount", 0),
                     "hashtag": hashtag,
-                    "source": "tiktok",
+                    "fuente_tipo": "tiktok",
                 })
         except Exception as exc:
             logger.warning("Error en TikTok para hashtag '%s': %s", hashtag, exc)
         return resultados
 
-    async def collect_all_async(self) -> list[dict]:
+    async def recolectar_todo_async(self) -> list[dict]:
         """Recolecta videos de TikTok para keywords políticas peruanas."""
         if not self._esta_disponible():
             return []
@@ -71,8 +71,8 @@ class TikTokCollector:
                 todos.extend(await self._fetch_hashtag(api, ht))
         return todos
 
-    def collect_all(self) -> list[dict]:
-        """Wrapper sincrónico de collect_all_async."""
+    def recolectar_todo(self) -> list[dict]:
+        """Wrapper sincrónico de recolectar_todo_async."""
         if not self._esta_disponible():
             return []
-        return asyncio.run(self.collect_all_async())
+        return asyncio.run(self.recolectar_todo_async())

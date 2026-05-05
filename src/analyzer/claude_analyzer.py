@@ -44,7 +44,7 @@ def _preparar_datos_para_prompt(datos_raw: list[dict]) -> str:
     secciones = []
 
     # Google Trends
-    trends = [d for d in datos_raw if "google_trends" in d.get("source", "")]
+    trends = [d for d in datos_raw if "google_trends" in d.get("fuente_tipo", "")]
     if trends:
         secciones.append("=== GOOGLE TRENDS (Perú) ===")
         for t in trends[:20]:
@@ -53,7 +53,7 @@ def _preparar_datos_para_prompt(datos_raw: list[dict]) -> str:
             secciones.append(f"- {t['keyword']}{score}{related}")
 
     # RSS
-    rss = [d for d in datos_raw if d.get("source") == "rss"]
+    rss = [d for d in datos_raw if d.get("fuente_tipo") == "rss"]
     if rss:
         secciones.append("\n=== ARTÍCULOS DE MEDIOS PERUANOS (RSS) ===")
         for art in rss[:30]:
@@ -63,7 +63,7 @@ def _preparar_datos_para_prompt(datos_raw: list[dict]) -> str:
             )
 
     # Twitter
-    twitter = [d for d in datos_raw if d.get("source") == "twitter"]
+    twitter = [d for d in datos_raw if d.get("fuente_tipo") == "twitter"]
     if twitter:
         secciones.append("\n=== TWITTER/X ===")
         for tw in twitter[:15]:
@@ -72,7 +72,7 @@ def _preparar_datos_para_prompt(datos_raw: list[dict]) -> str:
             )
 
     # TikTok
-    tiktok = [d for d in datos_raw if d.get("source") == "tiktok"]
+    tiktok = [d for d in datos_raw if d.get("fuente_tipo") == "tiktok"]
     if tiktok:
         secciones.append("\n=== TIKTOK ===")
         for tt in tiktok[:10]:
@@ -164,6 +164,8 @@ class ClaudeAnalyzer:
             max_tokens=max_tokens,
             messages=[{"role": "user", "content": prompt}],
         )
+        if not mensaje.content or not hasattr(mensaje.content[0], "text"):
+            raise RuntimeError("Respuesta inesperada de la API de Claude: contenido vacío o tipo desconocido")
         return mensaje.content[0].text
 
     def analizar_tendencias(self, datos_raw: list[dict]) -> AnalisisResult:

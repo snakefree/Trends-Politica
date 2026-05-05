@@ -24,6 +24,12 @@ except ImportError:
     _APSCHEDULER_DISPONIBLE = False
 
 
+_DIAS_SEMANA = {
+    "monday": "mon", "tuesday": "tue", "wednesday": "wed",
+    "thursday": "thu", "friday": "fri", "saturday": "sat", "sunday": "sun",
+}
+
+
 def _dir_datos() -> Path:
     base = os.getenv("DIRECTORIO_DATOS")
     if base:
@@ -43,8 +49,8 @@ def _cargar_estado() -> dict | None:
     if STATE_FILE.exists():
         try:
             return json.loads(STATE_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Estado del scheduler corrupto, ignorando: %s", exc)
     return None
 
 
@@ -54,39 +60,12 @@ def ejecutar_pipeline() -> dict:
     Retorna un dict con los paths de los archivos generados.
     """
     import asyncio
-    from src.collectors.google_trends_collector import GoogleTrendsCollector
-    from src.collectors.rss_collector import RSSCollector
-    from src.collectors.twitter_collector import TwitterCollector
-    from src.collectors.tiktok_collector import TikTokCollector
+    from src.pipeline import recolectar_datos
     from src.analyzer.claude_analyzer import ClaudeAnalyzer
     from src.reporter.report_generator import ReportGenerator
 
     logger.info("=== Iniciando pipeline de tendencias políticas ===")
-    datos_raw = []
-
-    # 1. Recolección RSS (siempre disponible)
-    logger.info("Paso 1/4: Recolectando RSS...")
-    rss = RSSCollector()
-    datos_raw.extend(asyncio.run(rss.collect_all()))
-
-    # 2. Google Trends
-    logger.info("Paso 2/4: Consultando Google Trends...")
-    try:
-        gt = GoogleTrendsCollector()
-        datos_raw.extend(gt.collect_all())
-    except ImportError as e:
-        logger.warning("Google Trends no disponible: %s", e)
-
-    # 3. Twitter/X (opcional)
-    logger.info("Paso 3/4: Recolectando Twitter/X (si disponible)...")
-    tw = TwitterCollector()
-    datos_raw.extend(tw.collect_all())
-
-    # 4. TikTok (opcional)
-    logger.info("Paso 4/4: Recolectando TikTok (si disponible)...")
-    tt = TikTokCollector()
-    datos_raw.extend(tt.collect_all())
-
+    datos_raw = asyncio.run(recolectar_datos("all"))
     logger.info("Total de items recolectados: %d", len(datos_raw))
 
     if not datos_raw:
@@ -127,9 +106,18 @@ def iniciar_scheduler(interval: str = "daily", hora: str = "08:00") -> None:
         trigger = IntervalTrigger(hours=1)
         logger.info("Scheduler configurado: cada hora")
     elif interval == "weekly":
+        import yaml as _yaml
+        _settings_path = Path(__file__).parent.parent.parent / "config" / "settings.yaml"
+        try:
+            with open(_settings_path, encoding="utf-8") as _f:
+                _cfg = _yaml.safe_load(_f)
+            _dia_nombre = _cfg.get("schedule", {}).get("dia_semana", "monday").lower()
+        except Exception:
+            _dia_nombre = "monday"
+        dia_semana = _DIAS_SEMANA.get(_dia_nombre, _dia_nombre)
         hora_h, hora_m = hora.split(":")
-        trigger = CronTrigger(day_of_week="mon", hour=int(hora_h), minute=int(hora_m))
-        logger.info("Scheduler configurado: lunes a las %s (Lima)", hora)
+        trigger = CronTrigger(day_of_week=dia_semana, hour=int(hora_h), minute=int(hora_m))
+        logger.info("Scheduler configurado: %s a las %s (Lima)", _dia_nombre, hora)
     else:  # daily
         hora_h, hora_m = hora.split(":")
         trigger = CronTrigger(hour=int(hora_h), minute=int(hora_m))

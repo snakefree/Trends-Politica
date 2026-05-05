@@ -49,7 +49,7 @@ class GoogleTrendsCollector:
                         "keyword": str(keyword),
                         "score": None,
                         "related": [],
-                        "source": "google_trends_daily",
+                        "fuente_tipo": "google_trends_daily",
                     })
             logger.info("Google Trends realtime: %d tendencias", len(tendencias))
             return tendencias
@@ -82,7 +82,7 @@ class GoogleTrendsCollector:
                         "keyword": kw,
                         "score": score,
                         "related": [],
-                        "source": "google_trends_interest",
+                        "fuente_tipo": "google_trends_interest",
                     })
             except Exception as exc:
                 logger.warning("Error en interest_over_time (lote %s): %s", lote, exc)
@@ -101,7 +101,7 @@ class GoogleTrendsCollector:
             logger.warning("Error en related_queries (%s): %s", keyword, exc)
         return []
 
-    def collect_all(self) -> list[dict]:
+    def recolectar_todo(self) -> list[dict]:
         """Pipeline completo: trending + interest sobre keywords configuradas."""
         trending = self.get_trending_searches()
         interest = self.get_interest_over_time()

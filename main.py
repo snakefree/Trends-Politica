@@ -10,11 +10,9 @@ Uso:
     python main.py schedule --interval daily  # Iniciar scheduler
     python main.py status                     # Estado del scheduler
 """
-import json
 import logging
 import os
 import sys
-from datetime import date
 from pathlib import Path
 
 import click
@@ -40,11 +38,9 @@ def _dir_reportes() -> Path:
 
 def _guardar_cache(datos: list) -> Path:
     """Guarda los datos crudos en data/raw_YYYY-MM-DD.json para reutilización."""
+    from src.pipeline import guardar_cache
     dir_datos = Path(os.getenv("DIRECTORIO_DATOS", str(Path(__file__).parent / "data")))
-    dir_datos.mkdir(parents=True, exist_ok=True)
-    path = dir_datos / f"raw_{date.today().isoformat()}.json"
-    path.write_text(json.dumps(datos, ensure_ascii=False, indent=2), encoding="utf-8")
-    return path
+    return guardar_cache(datos, dir_datos)
 
 
 def _ultimo_informe() -> Path | None:
@@ -82,36 +78,10 @@ def cli():
 def run(source: str, solo_recolectar: bool):
     """Ejecuta el pipeline de tendencias (recolección → análisis → informe)."""
     import asyncio
-    from src.collectors.rss_collector import RSSCollector
-    from src.collectors.twitter_collector import TwitterCollector
-    from src.collectors.tiktok_collector import TikTokCollector
+    from src.pipeline import recolectar_datos
 
-    datos_raw = []
-
-    if source in ("all", "rss"):
-        click.echo("Recolectando RSS...")
-        rss = RSSCollector()
-        datos_raw.extend(asyncio.run(rss.collect_all()))
-
-    if source in ("all", "google_trends"):
-        click.echo("Consultando Google Trends...")
-        try:
-            from src.collectors.google_trends_collector import GoogleTrendsCollector
-            gt = GoogleTrendsCollector()
-            datos_raw.extend(gt.collect_all())
-        except ImportError as e:
-            click.echo(f"  [aviso] Google Trends no disponible: {e}", err=True)
-
-    if source in ("all", "twitter"):
-        click.echo("Recolectando Twitter/X...")
-        tw = TwitterCollector()
-        datos_raw.extend(tw.collect_all())
-
-    if source in ("all", "tiktok"):
-        click.echo("Recolectando TikTok...")
-        tt = TikTokCollector()
-        datos_raw.extend(tt.collect_all())
-
+    click.echo(f"Recolectando datos (fuente={source})...")
+    datos_raw = asyncio.run(recolectar_datos(source))
     click.echo(f"Total recolectado: {len(datos_raw)} items")
 
     if not datos_raw:
